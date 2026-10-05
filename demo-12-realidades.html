@@ -1,0 +1,665 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Prenda inteligente — experiencia interactiva</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #090910;
+    --text: #f5f0e8;
+    --muted: #c0b8af;
+    --accent: #ffd166;
+    --panel: rgba(14, 13, 20, 0.78);
+    font-family: "Helvetica Neue", Arial, "Segoe UI", sans-serif;
+    font-synthesis: none;
+  }
+  * { box-sizing: border-box; }
+  html, body { width: 100%; min-height: 100%; margin: 0; background: var(--bg); color: var(--text); }
+  body { min-height: 100vh; min-height: 100dvh; overflow: hidden; }
+  button { font: inherit; }
+  .experience { position: relative; min-height: 100vh; min-height: 100dvh; isolation: isolate; background: radial-gradient(ellipse at 50% 45%, #282333 0, #111019 42%, #090910 78%); }
+  .stage { position: absolute; inset: 0; overflow: hidden; }
+  #video, #poseCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #video { object-fit: cover; transform: scaleX(-1); opacity: 0.78; }
+  #poseCanvas { transform: scaleX(-1); }
+  .stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(7, 7, 12, 0.4), transparent 30%, transparent 65%, rgba(7, 7, 12, 0.74)); }
+  .topbar { position: absolute; z-index: 2; top: max(20px, env(safe-area-inset-top)); left: 24px; right: 24px; display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; pointer-events: none; }
+  .brand { margin: 0; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(245, 240, 232, 0.78); }
+  .session-id { margin: 5px 0 0; color: rgba(245, 240, 232, 0.62); font-size: 0.72rem; }
+  .top-actions { display: flex; gap: 8px; pointer-events: auto; }
+  .utility-button, .primary-button { border: 1px solid rgba(245, 240, 232, 0.28); color: var(--text); background: var(--panel); border-radius: 999px; padding: 10px 16px; cursor: pointer; transition: background 160ms ease, border-color 160ms ease; }
+  .utility-button:hover, .primary-button:hover { border-color: var(--accent); background: rgba(35, 31, 43, 0.94); }
+  button:disabled { cursor: wait; opacity: 0.55; }
+  [hidden] { display: none !important; }
+  .question { position: absolute; z-index: 2; left: 50%; top: 22%; width: min(680px, calc(100% - 36px)); transform: translate(-50%, -100%); padding: 0; color: var(--text); text-align: center; font-size: clamp(1.65rem, 4.6vw, 3.5rem); font-weight: 500; line-height: 1.12; letter-spacing: -0.035em; text-shadow: 0 2px 24px rgba(0, 0, 0, 0.9), 0 0 44px rgba(255, 209, 102, 0.18); transition: opacity 220ms ease, top 120ms ease, left 120ms ease; pointer-events: none; }
+  .question.is-hidden { opacity: 0; }
+  .footer { position: absolute; z-index: 2; left: 20px; right: 20px; bottom: max(22px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+  .status { max-width: min(760px, 100%); margin: 0; padding: 10px 18px; color: var(--text); font-size: 0.9rem; border: 1px solid rgba(245, 240, 232, 0.16); border-radius: 999px; background: var(--panel); backdrop-filter: blur(12px); }
+  .gesture-hint { margin: 0; color: rgba(245, 240, 232, 0.77); font-size: 0.78rem; letter-spacing: 0.04em; text-shadow: 0 1px 8px #000; }
+  .start-card { position: absolute; z-index: 3; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(480px, calc(100% - 36px)); padding: 30px; border: 1px solid rgba(245, 240, 232, 0.18); border-radius: 24px; background: rgba(12, 11, 18, 0.88); text-align: center; box-shadow: 0 24px 80px #0008; backdrop-filter: blur(18px); }
+  .start-card h1 { margin: 0 0 12px; font-size: clamp(1.55rem, 4vw, 2.15rem); font-weight: 500; letter-spacing: -0.035em; }
+  .start-card p { margin: 0 0 22px; color: var(--muted); font-size: 0.95rem; line-height: 1.6; }
+  .primary-button { border-color: var(--accent); color: #211b11; background: var(--accent); font-weight: 700; padding: 12px 24px; }
+  .primary-button:hover { color: #211b11; background: #ffe09a; }
+  .records { position: absolute; z-index: 2; left: 24px; bottom: max(86px, calc(env(safe-area-inset-bottom) + 76px)); max-width: min(360px, calc(100vw - 48px)); color: rgba(245, 240, 232, 0.74); font-size: 0.72rem; line-height: 1.5; pointer-events: none; }
+  @media (max-width: 600px) {
+    .topbar { left: 16px; right: 16px; }
+    .brand { font-size: 0.65rem; }
+    .session-id { font-size: 0.65rem; }
+    .top-actions { flex-direction: column; align-items: flex-end; }
+    .utility-button { padding: 8px 12px; font-size: 0.74rem; }
+    .footer { bottom: max(18px, env(safe-area-inset-bottom)); }
+    .status { font-size: 0.8rem; }
+    .records { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; } }
+</style>
+</head>
+<body>
+<main class="experience">
+  <section class="stage" aria-label="Vista en vivo de la experiencia">
+    <video id="video" playsinline autoplay muted></video>
+    <canvas id="poseCanvas" aria-hidden="true"></canvas>
+    <p class="question" id="question" aria-live="polite">Activa la cámara para comenzar</p>
+  </section>
+
+  <header class="topbar">
+    <div>
+      <p class="brand">Prenda inteligente · experiencia corporal</p>
+      <p class="session-id" id="sessionLabel">Sesión aún no iniciada</p>
+    </div>
+    <nav class="top-actions" aria-label="Acciones de sesión">
+      <button class="utility-button" id="newSessionBtn" type="button" hidden>Nueva sesión</button>
+      <button class="utility-button" id="exportBtn" type="button" hidden>Descargar registros</button>
+    </nav>
+  </header>
+
+  <section class="start-card" id="startCard">
+    <h1>Escucha lo que dice tu cuerpo</h1>
+    <p>Colócate frente a la cámara. Asiente con la cabeza para iniciar y responde con tus manos, sin tocar la pantalla.</p>
+    <button class="primary-button" id="startBtn" type="button">Iniciar experiencia</button>
+  </section>
+
+  <footer class="footer">
+    <p class="status" id="statusMsg" role="status" aria-live="polite">Tus respuestas se guardan en este dispositivo con un identificador de sesión.</p>
+    <p class="gesture-hint" id="gestureHint"></p>
+  </footer>
+  <p class="records" id="recordSummary"></p>
+</main>
+
+<script type="module">
+const VISION_WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
+const VISION_BUNDLE_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+const POSE_MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+const HAND_MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+const STORAGE_KEY = "prenda-inteligente-sesiones-v1";
+const INFERENCE_WIDTH = 640;
+const MAX_CONSECUTIVE_FRAME_ERRORS = 5;
+const QUESTIONS = [
+  { key: "comfort", category: "comfort", prompt: "¿Qué tan cómodo te sientes?" },
+  { key: "pressure", category: "pressure_perception", prompt: "¿Sientes presión en alguna zona?" },
+  { key: "movement", category: "movement_capability", prompt: "Levanta los brazos", movement: true },
+  { key: "fit_preference", category: "fit_preference", prompt: "¿Prefieres este ajuste?" },
+];
+const POSE_CONNECTIONS = [[2, 0], [0, 5], [11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24]];
+
+const video = document.getElementById("video");
+const canvas = document.getElementById("poseCanvas");
+const ctx = canvas.getContext("2d");
+const inferenceCanvas = document.createElement("canvas");
+const inferenceCtx = inferenceCanvas.getContext("2d", { willReadFrequently: true });
+const questionEl = document.getElementById("question");
+const statusEl = document.getElementById("statusMsg");
+const hintEl = document.getElementById("gestureHint");
+const sessionLabel = document.getElementById("sessionLabel");
+const recordSummary = document.getElementById("recordSummary");
+const startCard = document.getElementById("startCard");
+const startBtn = document.getElementById("startBtn");
+const newSessionBtn = document.getElementById("newSessionBtn");
+const exportBtn = document.getElementById("exportBtn");
+
+let poseTask = null;
+let handTask = null;
+let visionFilesetPromise = null;
+let running = false;
+let lastVideoTime = -1;
+let consecutiveFrameErrors = 0;
+let session = null;
+let stepIndex = -1;
+let mode = "awaiting-nod";
+let nodBaseline = null;
+let nodCalibrationFrames = 0;
+let nodCalibrationTotal = 0;
+let nodStartedAt = 0;
+let nodCandidate = false;
+let nodPeak = 0;
+let gestureCandidate = null;
+let gestureFrames = 0;
+let neutralFrames = 0;
+let transitionTimer = null;
+
+startBtn.addEventListener("click", startExperience);
+newSessionBtn.addEventListener("click", startNewSession);
+exportBtn.addEventListener("click", exportSessions);
+
+async function startExperience() {
+  startBtn.disabled = true;
+  setStatus("Solicitando acceso a la cámara y preparando la detección…");
+  try {
+    if (!video.srcObject) await initCamera();
+    if (!poseTask || !handTask) await Promise.all([loadPoseTask(), loadHandTask()]);
+    if (!session) await createSession();
+    running = true;
+    lastVideoTime = -1;
+    resetNodDetection();
+    startCard.hidden = true;
+    newSessionBtn.hidden = false;
+    exportBtn.hidden = false;
+    setQuestion("Asiente con la cabeza para comenzar");
+    setStatus("Ponte frente a la cámara y asiente una vez.");
+    hintEl.textContent = "Mira al frente y asiente despacio: baja y vuelve a levantar la cabeza.";
+    requestAnimationFrame(renderLoop);
+  } catch (error) {
+    console.error(error);
+    setStatus(`No se pudo iniciar la experiencia: ${error.message || "revisa los permisos y vuelve a intentarlo."}`);
+    startBtn.disabled = false;
+    startBtn.textContent = "Reintentar";
+  }
+}
+
+async function initCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error("este navegador no permite acceder a la cámara.");
+  }
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+    audio: false,
+  });
+  video.srcObject = stream;
+  await video.play();
+  if (video.readyState < 2) {
+    await new Promise((resolve, reject) => {
+      video.onloadedmetadata = resolve;
+      video.onerror = () => reject(new Error("no se pudo iniciar el video de la cámara."));
+    });
+  }
+  resizeCanvas();
+}
+
+function resizeCanvas() {
+  if (!video.videoWidth || !video.videoHeight) return;
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  inferenceCanvas.width = INFERENCE_WIDTH;
+  inferenceCanvas.height = Math.round(INFERENCE_WIDTH * video.videoHeight / video.videoWidth);
+}
+
+async function createVisionFileset() {
+  if (!visionFilesetPromise) {
+    visionFilesetPromise = import(VISION_BUNDLE_URL).then(({ FilesetResolver }) =>
+      FilesetResolver.forVisionTasks(VISION_WASM)
+    );
+  }
+  return visionFilesetPromise;
+}
+
+async function loadPoseTask() {
+  const vision = await createVisionFileset();
+  const mp = await import(VISION_BUNDLE_URL);
+  poseTask = await createTaskWithFallback(() => mp.PoseLandmarker.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: POSE_MODEL, delegate: "GPU" },
+    runningMode: "VIDEO",
+    numPoses: 1,
+  }), () => mp.PoseLandmarker.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: POSE_MODEL, delegate: "CPU" },
+    runningMode: "VIDEO",
+    numPoses: 1,
+  }), "pose");
+}
+
+async function loadHandTask() {
+  const vision = await createVisionFileset();
+  const mp = await import(VISION_BUNDLE_URL);
+  handTask = await createTaskWithFallback(() => mp.HandLandmarker.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: HAND_MODEL, delegate: "GPU" },
+    runningMode: "VIDEO",
+    numHands: 2,
+  }), () => mp.HandLandmarker.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: HAND_MODEL, delegate: "CPU" },
+    runningMode: "VIDEO",
+    numHands: 2,
+  }), "manos");
+}
+
+async function createTaskWithFallback(createGpu, createCpu, label) {
+  try {
+    return await createGpu();
+  } catch (gpuError) {
+    console.warn(`No se pudo iniciar la detección GPU de ${label}; se intentará con CPU.`, gpuError);
+    try {
+      return await createCpu();
+    } catch (cpuError) {
+      throw new Error(`no se pudo cargar el modelo de ${label}: ${cpuError.message || "error desconocido"}`);
+    }
+  }
+}
+
+async function createSession() {
+  const candidate = {
+    sessionId: makeSessionId(),
+    createdAt: new Date().toISOString(),
+    completedAt: null,
+    responses: [],
+  };
+  persistSession(candidate);
+  session = candidate;
+  stepIndex = -1;
+  resetNodDetection();
+  gestureCandidate = null;
+  gestureFrames = 0;
+  neutralFrames = 0;
+  renderSessionSummary();
+}
+
+function makeSessionId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") return window.crypto.randomUUID();
+  return `sesion-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
+function readSessions() {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (!stored) return [];
+  const parsed = JSON.parse(stored);
+  if (!Array.isArray(parsed)) throw new Error("los registros guardados no tienen un formato válido.");
+  return parsed;
+}
+
+function persistSession(candidate) {
+  const sessions = readSessions();
+  const index = sessions.findIndex((entry) => entry.sessionId === candidate.sessionId);
+  if (index === -1) sessions.push(candidate);
+  else sessions[index] = candidate;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+}
+
+function appendRecord(record) {
+  const candidate = { ...session, responses: [...session.responses, { ...record, recordedAt: new Date().toISOString() }] };
+  persistSession(candidate);
+  session = candidate;
+  renderSessionSummary();
+}
+
+async function startNewSession() {
+  if (transitionTimer) clearTimeout(transitionTimer);
+  try {
+    await createSession();
+    mode = "awaiting-nod";
+    stepIndex = -1;
+    resetNodDetection();
+    gestureCandidate = null;
+    gestureFrames = 0;
+    neutralFrames = 0;
+    setQuestion("Asiente con la cabeza para comenzar");
+    setStatus("Nueva sesión. Ponte frente a la cámara y asiente una vez.");
+    hintEl.textContent = "Mira al frente y asiente despacio: baja y vuelve a levantar la cabeza.";
+    if (!running) await startExperience();
+  } catch (error) {
+    console.error(error);
+    setStatus(`No se pudo guardar la nueva sesión: ${error.message}`);
+  }
+}
+
+function renderSessionSummary() {
+  if (!session) return;
+  sessionLabel.textContent = `Sesión ${session.sessionId}`;
+  const totalSessions = readSessions().length;
+  recordSummary.textContent = `${session.responses.length} ${session.responses.length === 1 ? "registro" : "registros"} en esta sesión · ${totalSessions} ${totalSessions === 1 ? "sesión guardada" : "sesiones guardadas"} en este dispositivo`;
+}
+
+function exportSessions() {
+  try {
+    const data = readSessions();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "registros-prenda-inteligente.json";
+    link.click();
+    URL.revokeObjectURL(url);
+    setStatus("Registros descargados en formato JSON.");
+  } catch (error) {
+    console.error(error);
+    setStatus(`No se pudieron exportar los registros: ${error.message}`);
+  }
+}
+
+function renderLoop(timestampMs) {
+  if (!running) return;
+  if (video.currentTime !== lastVideoTime && video.readyState >= 2) {
+    lastVideoTime = video.currentTime;
+    try {
+      inferenceCtx.drawImage(video, 0, 0, inferenceCanvas.width, inferenceCanvas.height);
+      const poseResult = poseTask.detectForVideo(inferenceCanvas, timestampMs);
+      const handResult = handTask.detectForVideo(inferenceCanvas, timestampMs);
+      const pose = poseResult.landmarks && poseResult.landmarks[0];
+      const hands = handResult.landmarks || [];
+      consecutiveFrameErrors = 0;
+      drawPose(pose);
+      updateQuestionPosition(pose);
+      processInteraction(pose, hands, timestampMs);
+    } catch (error) {
+      console.error(error);
+      consecutiveFrameErrors++;
+      resetNodDetection();
+      if (consecutiveFrameErrors >= MAX_CONSECUTIVE_FRAME_ERRORS) {
+        running = false;
+        startCard.hidden = false;
+        startBtn.disabled = false;
+        startBtn.textContent = "Reanudar";
+        setStatus(`La detección se pausó tras varios errores: ${error.message || "no se pudo analizar la cámara."}`);
+      } else {
+        setStatus(`Reintentando la detección (${consecutiveFrameErrors}/${MAX_CONSECUTIVE_FRAME_ERRORS})…`);
+      }
+    }
+  }
+  if (running) requestAnimationFrame(renderLoop);
+}
+
+function processInteraction(pose, hands, now) {
+  if (mode === "awaiting-nod") {
+    if (detectNod(pose, now)) {
+      try {
+        appendRecord({ key: "start", category: "interaction_start", question: "Asiente con la cabeza para comenzar", value: true, displayValue: "Asentimiento detectado" });
+      } catch (error) {
+        showStorageError(error);
+        return;
+      }
+      stepIndex = 0;
+      mode = "responding";
+      setStepPrompt();
+    } else if (!pose) {
+      setStatus("Colócate frente a la cámara para que pueda reconocer tu cabeza y tus manos.");
+    } else if (getPoseHeadMovement(pose) === null) {
+      setStatus("Acércate un poco y mira al frente para que la cámara reconozca tus ojos y tu nariz.");
+    }
+    return;
+  }
+
+  if (mode === "transition" || mode === "complete") return;
+  const step = QUESTIONS[stepIndex];
+  if (!step) return;
+
+  if (step.movement) {
+    if (detectRaisedArms(pose)) {
+      try {
+        appendRecord({ key: step.key, category: step.category, question: step.prompt, value: true, displayValue: "Brazos levantados" });
+      } catch (error) {
+        showStorageError(error);
+        return;
+      }
+      advanceStep();
+    } else {
+      setStatus(pose ? "Levanta ambos brazos por encima de los hombros." : "Mantén el cuerpo visible para detectar el movimiento.");
+    }
+    return;
+  }
+
+  const gesture = classifyGesture(hands);
+  if (mode === "waiting-neutral") {
+    if (gesture === null) neutralFrames++;
+    else neutralFrames = 0;
+    if (neutralFrames >= 6) {
+      mode = "responding";
+      gestureCandidate = null;
+      gestureFrames = 0;
+      setStatus("Cuando estés listo, responde con una mano abierta o un puño.");
+      hintEl.textContent = "Mano abierta · Sí     Puño cerrado · No";
+    } else {
+      setStatus("Baja la mano un momento para continuar con la siguiente pregunta.");
+    }
+    return;
+  }
+
+  if (!gesture) {
+    gestureCandidate = null;
+    gestureFrames = 0;
+    setStatus(hands.length ? "No reconocí un gesto claro. Prueba con la mano abierta o el puño." : "Muestra una mano abierta para Sí o un puño cerrado para No.");
+    return;
+  }
+  if (gestureCandidate === gesture) gestureFrames++;
+  else {
+    gestureCandidate = gesture;
+    gestureFrames = 1;
+  }
+  if (gestureFrames < 8) {
+    setStatus(gesture === "yes" ? "Mano abierta reconocida… mantén el gesto." : "Puño reconocido… mantén el gesto.");
+    return;
+  }
+
+  try {
+    appendRecord({
+      key: step.key,
+      category: step.category,
+      question: step.prompt,
+      value: gesture === "yes",
+      displayValue: gesture === "yes" ? "Sí" : "No",
+    });
+  } catch (error) {
+    showStorageError(error);
+    gestureFrames = 0;
+    return;
+  }
+  advanceStep();
+}
+
+function detectNod(pose, now) {
+  const movement = getPoseHeadMovement(pose);
+  if (movement === null) {
+    resetNodDetection();
+    return false;
+  }
+  if (nodBaseline === null) {
+    nodCalibrationTotal += movement;
+    nodCalibrationFrames++;
+    if (nodCalibrationFrames >= 12) {
+      nodBaseline = nodCalibrationTotal / nodCalibrationFrames;
+    } else {
+      setStatus("Reconociendo tu postura… luego asiente despacio.");
+    }
+    return false;
+  }
+
+  const delta = movement - nodBaseline;
+  const threshold = 0.12;
+  const returnThreshold = 0.055;
+  const excursion = Math.abs(delta);
+  if (!nodCandidate && excursion >= threshold) {
+    nodCandidate = true;
+    nodStartedAt = now;
+    nodPeak = excursion;
+  }
+  if (nodCandidate) {
+    nodPeak = Math.max(nodPeak, excursion);
+    if (now - nodStartedAt > 2200) {
+      nodCandidate = false;
+      nodBaseline = movement;
+      nodPeak = 0;
+      return false;
+    }
+    if (nodPeak >= threshold && excursion <= returnThreshold && now - nodStartedAt >= 100) {
+      resetNodDetection();
+      return true;
+    }
+  } else {
+    nodBaseline += clamp(delta * 0.035, -0.015, 0.015);
+  }
+  return false;
+}
+
+function getPoseHeadMovement(pose) {
+  if (!pose || !isVisible(pose[0]) || !isVisible(pose[2]) || !isVisible(pose[5])) return null;
+  const eyeMidpoint = midpoint(pose[2], pose[5]);
+  const eyeDistance = distance(pose[2], pose[5]);
+  if (eyeDistance < 0.015) return null;
+  return (pose[0].y - eyeMidpoint.y) / eyeDistance;
+}
+
+function resetNodDetection() {
+  nodBaseline = null;
+  nodCalibrationFrames = 0;
+  nodCalibrationTotal = 0;
+  nodCandidate = false;
+  nodPeak = 0;
+  nodStartedAt = 0;
+}
+
+function detectRaisedArms(pose) {
+  if (!pose || ![11, 12, 15, 16].every((index) => isVisible(pose[index]))) return false;
+  return pose[15].y < pose[11].y - 0.04 && pose[16].y < pose[12].y - 0.04;
+}
+
+function classifyGesture(hands) {
+  for (const hand of hands) {
+    if (!hand || hand.length < 21) continue;
+    const wrist = hand[0];
+    const palmScale = distance(wrist, hand[9]);
+    if (palmScale < 0.015) continue;
+    let extended = 0;
+    [[8, 6], [12, 10], [16, 14], [20, 18]].forEach(([tipIndex, jointIndex]) => {
+      const tipDistance = distance(wrist, hand[tipIndex]);
+      const jointDistance = distance(wrist, hand[jointIndex]);
+      if (tipDistance > jointDistance * 1.18 && tipDistance - jointDistance > palmScale * 0.16) extended++;
+    });
+    if (extended >= 3) return "yes";
+    if (extended <= 1) return "no";
+  }
+  return null;
+}
+
+function advanceStep() {
+  mode = "transition";
+  questionEl.classList.add("is-hidden");
+  hintEl.textContent = "";
+  setStatus("Respuesta registrada.");
+  if (transitionTimer) clearTimeout(transitionTimer);
+  transitionTimer = setTimeout(() => {
+    stepIndex++;
+    if (stepIndex >= QUESTIONS.length) {
+      finishSession();
+      return;
+    }
+    mode = QUESTIONS[stepIndex].movement ? "responding" : "waiting-neutral";
+    neutralFrames = 0;
+    gestureCandidate = null;
+    gestureFrames = 0;
+    setStepPrompt();
+  }, 650);
+}
+
+function finishSession() {
+  const candidate = { ...session, completedAt: new Date().toISOString() };
+  try {
+    persistSession(candidate);
+    session = candidate;
+  } catch (error) {
+    showStorageError(error);
+    mode = "complete";
+    setQuestion("Gracias por escuchar a tu cuerpo");
+    hintEl.textContent = "Las respuestas anteriores están guardadas; no se pudo marcar el cierre de la sesión.";
+    return;
+  }
+  mode = "complete";
+  setQuestion("Gracias por escuchar a tu cuerpo");
+  setStatus("Experiencia completada. Tus respuestas quedaron guardadas en esta sesión.");
+  hintEl.textContent = "Puedes descargar los registros o iniciar una nueva sesión.";
+  renderSessionSummary();
+}
+
+function setStepPrompt() {
+  const step = QUESTIONS[stepIndex];
+  setQuestion(step.prompt);
+  if (step.movement) {
+    setStatus("Levanta ambos brazos por encima de los hombros.");
+    hintEl.textContent = "Mantén la posición un instante para registrar tu movimiento.";
+  } else if (mode === "waiting-neutral") {
+    setStatus("Baja la mano un momento para continuar con la siguiente pregunta.");
+    hintEl.textContent = "Mano abierta · Sí     Puño cerrado · No";
+  } else {
+    setStatus("Responde con una mano abierta para Sí o un puño cerrado para No.");
+    hintEl.textContent = "Mano abierta · Sí     Puño cerrado · No";
+  }
+  questionEl.classList.remove("is-hidden");
+}
+
+function setQuestion(text) {
+  questionEl.textContent = text;
+  questionEl.classList.remove("is-hidden");
+}
+
+function showStorageError(error) {
+  console.error(error);
+  setStatus(`No se pudo guardar la respuesta; la pregunta sigue activa. ${error.message || "Revisa el almacenamiento del navegador."}`);
+}
+
+function setStatus(text) {
+  statusEl.textContent = text;
+}
+
+function updateQuestionPosition(pose) {
+  let x = 50;
+  let y = 23;
+  if (pose && isVisible(pose[0])) {
+    x = (1 - pose[0].x) * 100;
+    y = Math.max(16, Math.min(70, (pose[0].y - 0.1) * 100));
+  }
+  questionEl.style.left = `${x}%`;
+  questionEl.style.top = `${y}%`;
+}
+
+function drawPose(pose) {
+  if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) resizeCanvas();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!pose) return;
+  ctx.lineWidth = Math.max(2, canvas.width / 420);
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(255, 209, 102, 0.82)";
+  ctx.shadowColor = "#ffd166";
+  ctx.shadowBlur = 12;
+  POSE_CONNECTIONS.forEach(([start, end]) => {
+    const a = pose[start], b = pose[end];
+    if (!isVisible(a) || !isVisible(b)) return;
+    ctx.beginPath();
+    ctx.moveTo(a.x * canvas.width, a.y * canvas.height);
+    ctx.lineTo(b.x * canvas.width, b.y * canvas.height);
+    ctx.stroke();
+  });
+  ctx.shadowBlur = 0;
+  [0, 2, 5, 11, 12, 13, 14, 15, 16].forEach((index) => {
+    const point = pose[index];
+    if (!isVisible(point)) return;
+    ctx.beginPath();
+    ctx.fillStyle = index === 0 ? "#fff2c6" : "#ffd166";
+    ctx.arc(point.x * canvas.width, point.y * canvas.height, Math.max(3, canvas.width / 150), 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function isVisible(point) {
+  return Boolean(point && (point.visibility === undefined || point.visibility > 0.4));
+}
+
+function midpoint(a, b) {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+function distance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+window.addEventListener("resize", resizeCanvas);
+</script>
+</body>
+</html>
